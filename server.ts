@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://lqckmlexslwrdfotsbxx.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxY2ttbGV4c2x3cmRmb3RzYnh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NDI5ODIsImV4cCI6MjA4ODAxODk4Mn0.wsrqknhCHjmp_GpXalAIDy9q18fA-c8MWz3QRnyk3_g';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const db = new Database('database.sqlite');
