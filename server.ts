@@ -22,6 +22,11 @@ db.exec(`
     id TEXT PRIMARY KEY,
     data TEXT
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+  INSERT OR IGNORE INTO settings (key, value) VALUES ('last_invoice_number', '0');
 `);
 
 async function startServer() {
@@ -98,6 +103,30 @@ async function startServer() {
       res.json({ success: true });
     } else {
       db.prepare('DELETE FROM recurring_invoices WHERE id = ?').run(req.params.id);
+      res.json({ success: true });
+    }
+  });
+
+  // Settings / Invoice Number
+  app.get('/api/settings/invoice-number', async (req, res) => {
+    if (supabase) {
+      const { data, error } = await supabase.from('settings').select('value').eq('key', 'last_invoice_number').single();
+      if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
+      res.json({ value: data?.value || '0' });
+    } else {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('last_invoice_number') as { value: string };
+      res.json({ value: row?.value || '0' });
+    }
+  });
+
+  app.post('/api/settings/invoice-number', async (req, res) => {
+    const { value } = req.body;
+    if (supabase) {
+      const { error } = await supabase.from('settings').upsert({ key: 'last_invoice_number', value: value.toString() });
+      if (error) return res.status(500).json({ error: error.message });
+      res.json({ success: true });
+    } else {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('last_invoice_number', value.toString());
       res.json({ success: true });
     }
   });

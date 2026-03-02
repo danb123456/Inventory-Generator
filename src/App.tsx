@@ -67,6 +67,18 @@ export default function App() {
       .then(r => r.json())
       .then(setRecurringInvoices)
       .catch(console.error);
+
+    fetch('/api/settings/invoice-number')
+      .then(r => r.json())
+      .then(res => {
+        const lastNum = parseInt(res.value || '0');
+        const nextNum = lastNum + 1;
+        setData(prev => ({
+          ...prev,
+          invoiceNumber: `INV-${nextNum.toString().padStart(4, '0')}`
+        }));
+      })
+      .catch(console.error);
   }, []);
 
   const handleAddClient = async (client: Client) => {
@@ -99,8 +111,32 @@ export default function App() {
     setRecurringInvoices(recurringInvoices.filter(r => r.id !== id));
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    const originalTitle = document.title;
+    const customerName = data.customer.name || 'Unknown Customer';
+    document.title = `${data.invoiceNumber} - ${customerName} - BBq Festals Ltd`;
+    
+    // Extract number from INV-XXXX
+    const currentNumStr = data.invoiceNumber.replace('INV-', '');
+    const currentNum = parseInt(currentNumStr);
+
     window.print();
+    document.title = originalTitle;
+
+    // Increment and save
+    if (!isNaN(currentNum)) {
+      const nextNum = currentNum + 1;
+      await fetch('/api/settings/invoice-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: currentNum.toString() }) // Save the one we just used as the "last"
+      });
+      
+      setData(prev => ({
+        ...prev,
+        invoiceNumber: `INV-${nextNum.toString().padStart(4, '0')}`
+      }));
+    }
   };
 
   const saveAsRecurring = () => {
