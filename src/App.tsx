@@ -58,18 +58,30 @@ export default function App() {
 
   // Load from database
   useEffect(() => {
-    fetch('/api/clients')
-      .then(r => r.json())
-      .then(setClients)
-      .catch(console.error);
-      
-    fetch('/api/recurring')
-      .then(r => r.json())
-      .then(setRecurringInvoices)
-      .catch(console.error);
+    const fetchWithLog = async (url: string, setter: (data: any) => void) => {
+      try {
+        const r = await fetch(url);
+        console.log(`GET ${url} status: ${r.status}`);
+        if (!r.ok) {
+          const err = await r.json();
+          console.error(`GET ${url} error details:`, err);
+          throw new Error(err.error || `HTTP error! status: ${r.status}`);
+        }
+        const d = await r.json();
+        setter(d);
+      } catch (e) {
+        console.error(`Error fetching ${url}:`, e);
+      }
+    };
+
+    fetchWithLog('/api/clients', setClients);
+    fetchWithLog('/api/recurring', setRecurringInvoices);
 
     fetch('/api/settings/invoice-number')
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) throw new Error('Failed to fetch invoice number');
+        return r.json();
+      })
       .then(res => {
         const lastNum = parseInt(res.value || '0');
         const nextNum = lastNum + 1;
