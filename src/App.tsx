@@ -10,6 +10,7 @@ import InvoicePreview from './components/InvoicePreview';
 import ClientManager from './components/ClientManager';
 import RecurringManager from './components/RecurringManager';
 import { Printer, Users, RefreshCw, FileText, Save } from 'lucide-react';
+import { supabase } from './utils/supabase';
 
 const initialData: InvoiceData = {
   invoiceNumber: 'INV-0001',
@@ -58,69 +59,70 @@ export default function App() {
 
   // Load from database
   useEffect(() => {
-    const fetchWithLog = async (url: string, setter: (data: any) => void) => {
+    const loadData = async () => {
       try {
-        const r = await fetch(url);
-        console.log(`GET ${url} status: ${r.status}`);
-        if (!r.ok) {
-          const err = await r.json();
-          console.error(`GET ${url} error details:`, err);
-          throw new Error(err.error || `HTTP error! status: ${r.status}`);
-        }
-        const d = await r.json();
-        setter(d);
-      } catch (e) {
-        console.error(`Error fetching ${url}:`, e);
-      }
-    };
+        // Fetch Clients
+        const { data: clientsData, error: clientsError } = await supabase.from('clients').select('data');
+        if (clientsError) throw clientsError;
+        setClients(clientsData.map(r => typeof r.data === 'string' ? JSON.parse(r.data) : r.data));
 
-    fetchWithLog('/api/clients', setClients);
-    fetchWithLog('/api/recurring', setRecurringInvoices);
+        // Fetch Recurring Invoices
+        const { data: recurringData, error: recurringError } = await supabase.from('recurring_invoices').select('data');
+        if (recurringError) throw recurringError;
+        setRecurringInvoices(recurringData.map(r => typeof r.data === 'string' ? JSON.parse(r.data) : r.data));
 
-    fetch('/api/settings/invoice-number')
-      .then(async r => {
-        if (!r.ok) throw new Error('Failed to fetch invoice number');
-        return r.json();
-      })
-      .then(res => {
-        const lastNum = parseInt(res.value || '0');
+        // Fetch Invoice Number
+        const { data: settingsData, error: settingsError } = await supabase.from('settings').select('value').eq('key', 'last_invoice_number').single();
+        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+        
+        const lastNum = parseInt(settingsData?.value || '0');
         const nextNum = lastNum + 1;
         setData(prev => ({
           ...prev,
           invoiceNumber: `INV-${nextNum.toString().padStart(4, '0')}`
         }));
-      })
-      .catch(console.error);
+      } catch (e) {
+        console.error('Error loading data from Supabase:', e);
+      }
+    };
+
+    loadData();
   }, []);
 
   const handleAddClient = async (client: Client) => {
-    await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(client) });
-    setClients([...clients, client]);
+    const { error } = await supabase.from('clients').upsert({ id: client.id, data: client });
+    if (error) console.error('Error adding client:', error);
+    else setClients([...clients, client]);
   };
 
   const handleUpdateClient = async (client: Client) => {
-    await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(client) });
-    setClients(clients.map(c => c.id === client.id ? client : c));
+    const { error } = await supabase.from('clients').upsert({ id: client.id, data: client });
+    if (error) console.error('Error updating client:', error);
+    else setClients(clients.map(c => c.id === client.id ? client : c));
   };
 
   const handleDeleteClient = async (id: string) => {
-    await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-    setClients(clients.filter(c => c.id !== id));
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) console.error('Error deleting client:', error);
+    else setClients(clients.filter(c => c.id !== id));
   };
 
   const handleAddRecurring = async (profile: RecurringInvoice) => {
-    await fetch('/api/recurring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
-    setRecurringInvoices([...recurringInvoices, profile]);
+    const { error } = await supabase.from('recurring_invoices').upsert({ id: profile.id, data: profile });
+    if (error) console.error('Error adding recurring profile:', error);
+    else setRecurringInvoices([...recurringInvoices, profile]);
   };
 
   const handleUpdateRecurring = async (profile: RecurringInvoice) => {
-    await fetch('/api/recurring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
-    setRecurringInvoices(recurringInvoices.map(r => r.id === profile.id ? profile : r));
+    const { error } = await supabase.from('recurring_invoices').upsert({ id: profile.id, data: profile });
+    if (error) console.error('Error updating recurring profile:', error);
+    else setRecurringInvoices(recurringInvoices.map(r => r.id === profile.id ? profile : r));
   };
 
   const handleDeleteRecurring = async (id: string) => {
-    await fetch(`/api/recurring/${id}`, { method: 'DELETE' });
-    setRecurringInvoices(recurringInvoices.filter(r => r.id !== id));
+    const { error } = await supabase.from('recurring_invoices').delete().eq('id', id);
+    if (error) console.error('Error deleting recurring profile:', error);
+    else setRecurringInvoices(recurringInvoices.filter(r => r.id !== id));
   };
 
   const handlePrint = async () => {
@@ -138,11 +140,8 @@ export default function App() {
     // Increment and save
     if (!isNaN(currentNum)) {
       const nextNum = currentNum + 1;
-      await fetch('/api/settings/invoice-number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: currentNum.toString() }) // Save the one we just used as the "last"
-      });
+      const { error } = await supabase.from('settings').upsert({ key: 'last_invoice_number', value: currentNum.toString() });
+      if (error) console.error('Error saving invoice number:', error);
       
       setData(prev => ({
         ...prev,
