@@ -62,4 +62,10 @@ export interface InvoiceData {
   customer: CustomerDetails;
   items: InvoiceItem[];
   isVatRegistered: boolean;
+  hasDeposit?: boolean;
+  depositAmount?: number;
+  depositVatRate?: VatRate;
+  depositDueDate?: string;
+  eventDate?: string;
+  balanceDueDate?: string;
 }

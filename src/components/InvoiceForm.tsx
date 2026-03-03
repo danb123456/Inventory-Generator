@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { InvoiceData, InvoiceItem, VatRate, Client } from '../types';
+import { InvoiceData, InvoiceItem, VatRate, Client, VAT_PERCENTAGES } from '../types';
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -438,6 +438,117 @@ export default function InvoiceForm({ data, clients, onChange, onSaveClient }: P
             <p className="text-sm text-gray-500 italic">No items added. Click "Add Item" to start.</p>
           )}
         </div>
+      </section>
+
+      {/* Deposit & Split Payment */}
+      <section>
+        <div className="flex items-center mb-4 border-b pb-2">
+          <input
+            type="checkbox"
+            id="hasDeposit"
+            checked={data.hasDeposit}
+            onChange={(e) => updateRootField('hasDeposit', e.target.checked)}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
+          <label htmlFor="hasDeposit" className="ml-2 block text-lg font-semibold text-gray-800">
+            Deposit & Split Payment
+          </label>
+        </div>
+        
+        {data.hasDeposit && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-indigo-50 rounded-md border border-indigo-100">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Deposit Amount ({data.currency})</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={data.depositAmount}
+                onChange={(e) => updateRootField('depositAmount', parseFloat(e.target.value) || 0)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Deposit VAT Rate</label>
+              <select
+                value={data.depositVatRate}
+                onChange={(e) => updateRootField('depositVatRate', e.target.value as VatRate)}
+                disabled={!data.isVatRegistered}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-white disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                <option value="Standard (20%)">Standard (20%)</option>
+                <option value="Reduced (5%)">Reduced (5%)</option>
+                <option value="Zero-rated (0%)">Zero-rated (0%)</option>
+                <option value="Exempt">Exempt</option>
+                <option value="Outside Scope">Outside Scope</option>
+                <option value="Reverse Charge">Reverse Charge</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Deposit Due Date</label>
+              <input
+                type="date"
+                value={data.depositDueDate}
+                onChange={(e) => updateRootField('depositDueDate', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Event Date (Optional)</label>
+              <input
+                type="date"
+                value={data.eventDate}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  updateRootField('eventDate', date);
+                  if (date) {
+                    // Default balance due date to 14 days before event
+                    const event = new Date(date);
+                    const balanceDue = new Date(event.getTime() - 14 * 24 * 60 * 60 * 1000);
+                    updateRootField('balanceDueDate', balanceDue.toISOString().split('T')[0]);
+                  }
+                }}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Balance Due Date</label>
+              <input
+                type="date"
+                value={data.balanceDueDate}
+                onChange={(e) => updateRootField('balanceDueDate', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+              />
+            </div>
+            <div className="md:col-span-2 pt-2 border-t border-indigo-200 mt-2">
+              <div className="flex justify-between text-sm font-semibold text-indigo-700">
+                <span>Remaining Balance:</span>
+                <span>{data.currency} {(data.items.reduce((acc, item) => {
+                  const lineTotal = item.quantity * item.unitPrice;
+                  const discountAmount = lineTotal * (item.discount / 100);
+                  const net = lineTotal - discountAmount;
+                  const vat = data.isVatRegistered ? net * (VAT_PERCENTAGES[item.vatRate] / 100) : 0;
+                  return acc + net + vat;
+                }, 0) - (
+                  (data.depositAmount || 0) + 
+                  (data.isVatRegistered && data.depositVatRate ? (data.depositAmount || 0) * (VAT_PERCENTAGES[data.depositVatRate] / 100) : 0)
+                )).toFixed(2)}</span>
+              </div>
+              {data.isVatRegistered && data.depositVatRate && data.depositAmount > 0 && (
+                <div className="flex justify-between text-[10px] text-indigo-500 mt-1 italic">
+                  <span>VAT to be added to deposit ({data.depositVatRate}):</span>
+                  <span>{data.currency} {((data.depositAmount || 0) * (VAT_PERCENTAGES[data.depositVatRate] / 100)).toFixed(2)}</span>
+                </div>
+              )}
+              {data.isVatRegistered && data.depositVatRate && data.depositAmount > 0 && (
+                <div className="flex justify-between text-[10px] text-indigo-700 font-bold mt-1">
+                  <span>Total Deposit Due:</span>
+                  <span>{data.currency} {((data.depositAmount || 0) * (1 + (VAT_PERCENTAGES[data.depositVatRate] / 100))).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Payment & Notes */}

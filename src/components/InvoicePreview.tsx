@@ -40,6 +40,19 @@ export default function InvoicePreview({ data }: Props) {
   });
 
   const totalPayable = totalNet + totalVat;
+  
+  let depositTotalDue = 0;
+  let depositVatAmount = 0;
+  
+  if (data.hasDeposit) {
+    const baseDeposit = data.depositAmount || 0;
+    if (data.isVatRegistered && data.depositVatRate) {
+      depositVatAmount = baseDeposit * (VAT_PERCENTAGES[data.depositVatRate] / 100);
+    }
+    depositTotalDue = baseDeposit + depositVatAmount;
+  }
+
+  const balanceRemaining = totalPayable - depositTotalDue;
 
   return (
     <div className="bg-white p-8 md:p-12 text-gray-800 font-sans min-h-[297mm] w-full box-border text-sm flex flex-col">
@@ -142,6 +155,25 @@ export default function InvoicePreview({ data }: Props) {
             <span className="text-gray-800">Total Payable</span>
             <span className="text-gray-900">{formatCurrency(totalPayable, data.currency)}</span>
           </div>
+
+          {data.hasDeposit && (
+            <div className="mt-4 space-y-2 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+              <div className="flex justify-between text-sm font-bold text-indigo-900">
+                <span>Deposit Due ({formatDate(data.depositDueDate)})</span>
+                <span>{formatCurrency(depositTotalDue, data.currency)}</span>
+              </div>
+              {data.isVatRegistered && data.depositVatRate && data.depositVatRate !== 'Zero-rated (0%)' && data.depositVatRate !== 'Exempt' && (
+                <div className="text-[10px] text-indigo-700/70 flex justify-between px-1 italic">
+                  <span>({formatCurrency(data.depositAmount || 0, data.currency)} Net + {data.depositVatRate} VAT)</span>
+                  <span>VAT: {formatCurrency(depositVatAmount, data.currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-medium text-gray-600">
+                <span>Balance Due ({formatDate(data.balanceDueDate)})</span>
+                <span>{formatCurrency(balanceRemaining, data.currency)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
