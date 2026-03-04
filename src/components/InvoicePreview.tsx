@@ -115,6 +115,7 @@ export default function InvoicePreview({ data }: Props) {
               <th className="py-3 px-2 text-right">Discount</th>
               {data.isVatRegistered && <th className="py-3 px-2 text-right">VAT Rate</th>}
               <th className="py-3 px-2 text-right">Net Amount</th>
+              {data.isVatRegistered && <th className="py-3 px-2 text-right">Gross Amount</th>}
             </tr>
           </thead>
           <tbody>
@@ -132,6 +133,11 @@ export default function InvoicePreview({ data }: Props) {
                 <td className="py-3 px-2 text-right text-gray-800 font-medium">
                   {formatCurrency(item.netAmount, data.currency)}
                 </td>
+                {data.isVatRegistered && (
+                  <td className="py-3 px-2 text-right text-gray-900 font-bold">
+                    {formatCurrency(item.grossAmount, data.currency)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
